@@ -1,0 +1,67 @@
+name: Bygg APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kontrollera signeringsnyckel
+        env:
+          KEYSTORE_B64: ${{ secrets.DUOPAPER_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.DUOPAPER_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Secrets DUOPAPER_KEYSTORE_B64 och DUOPAPER_KEYSTORE_PASSWORD saknas (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/duopaper-release.jks"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Bygg signerad release-APK
+        env:
+          DUOPAPER_KEYSTORE_PATH: ${{ runner.temp }}/duopaper-release.jks
+          DUOPAPER_KEYSTORE_PASSWORD: ${{ secrets.DUOPAPER_KEYSTORE_PASSWORD }}
+        run: |
+          gradle --no-daemon :app:assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk DuoPaper.apk
+          rm -f "$RUNNER_TEMP/duopaper-release.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DuoPaper-apk
+          path: DuoPaper.apk
+
+      - name: Publicera som senaste release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: DuoPaper (bygge ${{ github.run_number }})
+          body: |
+            Ladda ner **DuoPaper.apk** på telefonen och installera.
+            Fast länk till senaste versionen:
+            https://github.com/${{ github.repository }}/releases/latest/download/DuoPaper.apk
+          files: DuoPaper.apk
+          make_latest: true
