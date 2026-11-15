@@ -16,7 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Kontrollera signeringsnyckel
         env:
@@ -29,17 +29,16 @@ jobs:
           fi
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/duopaper-release.jks"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
-      - uses: android-actions/setup-android@v3
 
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
+      # Android SDK finns förinstallerat på GitHubs ubuntu-maskiner ($ANDROID_HOME)
       - name: Bygg signerad release-APK
         env:
           DUOPAPER_KEYSTORE_PATH: ${{ runner.temp }}/duopaper-release.jks
